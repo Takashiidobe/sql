@@ -33,14 +33,14 @@ fn main() -> Result<()> {
                     Ok(t) => {
                         println!("{:?}", t);
                     }
-                    Err(e) => println!("err {:?}", e),
+                    Err(e) => eprintln!("err {:?}", e),
                 }
                 process_command(query, &mut db);
 
                 println!("query processed");
             }
             Err(e) => {
-                println!("{}", e);
+                eprintln!("{}", e);
             }
         }
     }

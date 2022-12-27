@@ -23,40 +23,36 @@ impl InsertQuery {
             for c in cols {
                 columns.push(c.to_string());
             }
-            match &**source {
-                Query { body, .. } => {
-                    if let SetExpr::Values(values) = body.as_ref() {
-                        if let Values { rows, .. } = values {
-                            for i in rows {
-                                let mut value_set: Vec<String> = vec![];
-                                for e in i {
-                                    match e {
-                                        Expr::Value(v) => match v {
-                                            Value::Number(n, _) => {
-                                                value_set.push(n.to_string());
-                                            }
-                                            Value::Boolean(b) => match b {
-                                                true => value_set.push("true".to_string()),
-                                                false => value_set.push("false".to_string()),
-                                            },
-                                            Value::SingleQuotedString(sqs) => {
-                                                value_set.push(sqs.to_string());
-                                            }
-                                            Value::Null => {
-                                                value_set.push("Null".to_string());
-                                            }
-                                            _ => {}
-                                        },
-                                        Expr::Identifier(i) => {
-                                            value_set.push(i.to_string());
-                                        }
-                                        _ => {}
-                                    }
+            let Query { body, .. } = &**source;
+            if let SetExpr::Values(values) = body.as_ref() {
+                let Values { rows, .. } = values;
+                for row in rows {
+                    let mut value_set: Vec<String> = vec![];
+                    for expr in row {
+                        match expr {
+                            Expr::Value(v) => match v {
+                                Value::Number(n, _) => {
+                                    value_set.push(n.to_string());
                                 }
-                                all_vals.push(value_set);
+                                Value::Boolean(b) => match b {
+                                    true => value_set.push("true".to_string()),
+                                    false => value_set.push("false".to_string()),
+                                },
+                                Value::SingleQuotedString(sqs) => {
+                                    value_set.push(sqs.to_string());
+                                }
+                                Value::Null => {
+                                    value_set.push("Null".to_string());
+                                }
+                                _ => {}
+                            },
+                            Expr::Identifier(i) => {
+                                value_set.push(i.to_string());
                             }
+                            _ => {}
                         }
                     }
+                    all_vals.push(value_set);
                 }
             }
         }

@@ -100,12 +100,15 @@ pub fn handle_meta_command(cmd: MetaCommand, db: &mut Database) {
             }
         }
         MetaCommand::Persist(file_path) => {
-            let mut buffered_writer = BufWriter::new(File::create(file_path).unwrap());
+            let mut buffered_writer = BufWriter::new(
+                File::create(file_path).expect("Could not create or write to file to persist to"),
+            );
             bincode::serialize_into(&mut buffered_writer, &db)
                 .expect("Error while trying to serialize to binary data");
         }
         MetaCommand::Restore(file_path) => {
-            let mut file = File::open(file_path).unwrap();
+            let mut file =
+                File::open(file_path).expect("Could not open or find file to restore from");
             let decoded_db: Database = bincode::deserialize_from(&mut file).unwrap();
             *db = decoded_db;
         }
@@ -117,25 +120,30 @@ pub fn process_command(query: String, db: &mut Database) {
     let dialect = MySqlDialect {};
     let statements = &Parser::parse_sql(&dialect, &query).unwrap();
 
-    for s in statements {
-        println!("{:?}", s);
-        match s {
+    for statement in statements {
+        println!("{:?}", statement);
+        match statement {
             Statement::CreateTable { .. } => {
-                let cq = CreateQuery::new(s).unwrap();
-                db.tables.push(Table::new(cq));
+                let create_query = CreateQuery::new(statement).unwrap();
+                db.tables.push(Table::new(create_query));
             }
             Statement::Insert { .. } => {
-                let iq = InsertQuery::new(s);
-                match iq {
-                    Ok(iq) => {
-                        let table_name = iq.table_name;
-                        let columns = iq.columns;
-                        let values = iq.values;
+                let insert_query = InsertQuery::new(statement);
+                match insert_query {
+                    Ok(InsertQuery {
+                        table_name,
+                        columns,
+                        values,
+                        ..
+                    }) => {
                         println!("cols = {:?}\n vals = {:?}", columns, values);
                         match db.table_exists(table_name.to_string()) {
                             true => {
                                 let db_table = db.get_table_mut(table_name.to_string());
-                                match columns.iter().all(|c| db_table.column_exist(c.to_string())) {
+                                match columns
+                                    .iter()
+                                    .all(|c| db_table.column_exists(c.to_string()))
+                                {
                                     true => {
                                         for value in &values {
                                             match db_table
@@ -162,8 +170,8 @@ pub fn process_command(query: String, db: &mut Database) {
                     Err(err) => println!("Error while trying to parse insert statement: {}", err),
                 }
             }
-            Statement::Query(_q) => {
-                let select_query = SelectQuery::new(s);
+            Statement::Query(_) => {
+                let select_query = SelectQuery::new(statement);
                 match select_query {
                     Ok(mut sq) => match db.table_exists(sq.from.to_string()) {
                         true => {
@@ -183,7 +191,7 @@ pub fn process_command(query: String, db: &mut Database) {
                             }
 
                             for col in &sq.projection {
-                                if !db_table.column_exist((&col).to_string()) {
+                                if !db_table.column_exists((&col).to_string()) {
                                     println!(
                                         "Cannot execute query, cannot find column {} in table {}",
                                         col, db_table.name

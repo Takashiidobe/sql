@@ -6,6 +6,7 @@ use sqlparser::ast::{
 
 #[derive(Debug, PartialEq)]
 pub enum Binary {
+    NotEq,
     Eq,
     Lt,
     LtEq,
@@ -41,6 +42,13 @@ impl SelectQuery {
         n: &String,
     ) {
         match op {
+            sqlparser::ast::BinaryOperator::NotEq => {
+                where_expressions.push(Expression {
+                    left: col_name.to_string(),
+                    right: n.to_string(),
+                    op: Operator::Binary(Binary::NotEq),
+                });
+            }
             sqlparser::ast::BinaryOperator::Eq => {
                 where_expressions.push(Expression {
                     left: col_name.to_string(),

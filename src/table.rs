@@ -193,6 +193,15 @@ impl ColumnData {
         let mut scanned_vals = vec![];
         match &expr.op {
             Operator::Binary(binary_op) => match binary_op {
+                Binary::NotEq => Self::work(
+                    self,
+                    &search_term,
+                    &mut scanned_vals,
+                    |a, b| a == b,
+                    |a, b| a == b,
+                    |a, b| a == b,
+                    |a, b| a == b,
+                ),
                 Binary::Eq => Self::work(
                     self,
                     &search_term,
@@ -587,8 +596,8 @@ impl Table {
             }
         }
 
-        let rotated_data = util::rotate_2d_vec(&data);
-        util::pretty_print(&rotated_data, &sq.projection);
+        let rotated_data = Self::rotate_2d_vec(&data);
+        Self::pretty_print(&rotated_data, &sq.projection);
     }
 
     pub fn print_table(&self) {
@@ -642,8 +651,42 @@ impl Table {
         p_table.printstd();
     }
 
-    pub fn column_exist(&self, column: String) -> bool {
+    pub fn column_exists(&self, column: String) -> bool {
         self.columns.iter().any(|col| col.name == column)
+    }
+
+    fn rotate_2d_vec(data: &[Vec<String>]) -> Vec<Vec<&String>> {
+        match data.first() {
+            None => vec![vec![]],
+            _ => {
+                let number_of_rows = data.first().unwrap().len();
+                let number_of_cols = data.len();
+                let mut ret_data: Vec<Vec<&String>> = vec![vec![]; number_of_rows];
+
+                (0..number_of_rows).for_each(|row_idx| {
+                    (0..number_of_cols).for_each(|col_idx| {
+                        ret_data[row_idx].push(&data[col_idx][row_idx]);
+                    });
+                });
+
+                ret_data
+            }
+        }
+    }
+
+    fn pretty_print(data: &[Vec<&String>], header: &[String]) {
+        let mut p_table = PTable::new();
+
+        p_table.add_row(Row::new(
+            header.iter().map(|h| Cell::new(h)).collect::<Vec<Cell>>(),
+        ));
+
+        for row in data {
+            p_table.add_row(Row::new(
+                row.iter().map(|c| Cell::new(c)).collect::<Vec<Cell>>(),
+            ));
+        }
+        p_table.printstd();
     }
 }
 
@@ -706,43 +749,5 @@ mod tests {
             table.insert_row(&cols, &[val.clone()]);
             assert!(table.does_violate_unique_constraint(&cols, &val).is_err());
         }
-    }
-}
-
-mod util {
-    use super::{Cell, PTable, Row};
-
-    pub fn rotate_2d_vec(data: &Vec<Vec<String>>) -> Vec<Vec<&String>> {
-        match data.first() {
-            None => vec![vec![]],
-            _ => {
-                let number_of_rows = data.first().unwrap().len();
-                let number_of_cols = data.len();
-                let mut ret_data: Vec<Vec<&String>> = vec![vec![]; number_of_rows];
-
-                (0..number_of_rows).for_each(|row_idx| {
-                    (0..number_of_cols).for_each(|col_idx| {
-                        ret_data[row_idx].push(&data[col_idx][row_idx]);
-                    });
-                });
-
-                ret_data
-            }
-        }
-    }
-
-    pub fn pretty_print(data: &Vec<Vec<&String>>, header: &[String]) {
-        let mut p_table = PTable::new();
-
-        p_table.add_row(Row::new(
-            header.iter().map(|h| Cell::new(h)).collect::<Vec<Cell>>(),
-        ));
-
-        for row in data {
-            p_table.add_row(Row::new(
-                row.iter().map(|c| Cell::new(c)).collect::<Vec<Cell>>(),
-            ));
-        }
-        p_table.printstd();
     }
 }

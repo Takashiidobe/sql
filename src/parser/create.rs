@@ -17,12 +17,7 @@ pub struct CreateQuery {
 impl CreateQuery {
     pub fn new(statement: &Statement) -> Result<CreateQuery, String> {
         match statement {
-            Statement::CreateTable {
-                name,
-                columns,
-                constraints,
-                ..
-            } => {
+            Statement::CreateTable { name, columns, .. } => {
                 let table_name = name;
                 let mut parsed_columns: Vec<ParsedColumn> = vec![];
 
@@ -31,20 +26,22 @@ impl CreateQuery {
                     let datatype = match &col.data_type {
                         DataType::SmallInt(_) | DataType::Int(_) | DataType::BigInt(_) => "int",
                         DataType::Boolean => "bool",
-                        DataType::Text | DataType::Varchar(_) => "string",
-                        DataType::Float(_) | DataType::Double | DataType::Decimal(_) => "float",
+                        DataType::Text | DataType::Varchar(_) | DataType::String => "string",
+                        DataType::Float(_)
+                        | DataType::Double
+                        | DataType::DoublePrecision
+                        | DataType::Decimal(_) => "float",
                         _ => {
-                            println!("not matched on custom type");
+                            println!("could not match type");
                             "invalid"
                         }
                     };
 
                     let mut is_pk: bool = false;
                     for column_option in &col.options {
-                        is_pk = match column_option.option {
-                            ColumnOption::Unique { is_primary } => is_primary,
-                            _ => false,
-                        };
+                        if let ColumnOption::Unique { is_primary } = column_option.option {
+                            is_pk = is_primary;
+                        }
                     }
 
                     parsed_columns.push(ParsedColumn {
@@ -53,10 +50,6 @@ impl CreateQuery {
                         is_pk,
                         is_nullable: false,
                     });
-                }
-
-                for constraint in constraints {
-                    println!("{:?}", constraint);
                 }
 
                 Ok(CreateQuery {
