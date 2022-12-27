@@ -1,0 +1,16 @@
+[package]
+name = "sql"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.68"
+bincode = "1.3.3"
+prettytable-rs = "0.9.0"
+rustyline = "10.0.0"
+serde = { version = "1.0.151", features = ["derive"] }
+sqlparser = "0.28.0"
+sstb = "0.3.0-alpha"
+tempfile = "3.3.0"
