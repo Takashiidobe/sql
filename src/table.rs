@@ -2,7 +2,7 @@ use prettytable::{row, Cell, Row, Table as PTable};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::ops::Bound::{Excluded, Included, Unbounded};
+use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::result::Result;
 
 use crate::parser::{
@@ -61,10 +61,9 @@ impl ColumnHeader {
         let dt = DataType::new(datatype);
         let index = match dt {
             DataType::Int => ColumnIndex::Int(BTreeMap::new()),
-            DataType::Float => ColumnIndex::None,
             DataType::Str => ColumnIndex::Str(BTreeMap::new()),
             DataType::Bool => ColumnIndex::Bool(BTreeMap::new()),
-            DataType::Invalid => ColumnIndex::None,
+            DataType::Float | DataType::Invalid => ColumnIndex::None,
         };
 
         ColumnHeader {
@@ -197,10 +196,10 @@ impl ColumnData {
                     self,
                     &search_term,
                     &mut scanned_vals,
-                    |a, b| a == b,
-                    |a, b| a == b,
-                    |a, b| a == b,
-                    |a, b| a == b,
+                    |a, b| a != b,
+                    |a, b| a != b,
+                    |a, b| a != b,
+                    |a, b| a != b,
                 ),
                 Binary::Eq => Self::work(
                     self,
@@ -277,14 +276,23 @@ impl ColumnIndex {
                 Ok(val) => Ok(index.get(&val)),
                 Err(e) => Err(e.to_string()),
             },
-
             ColumnIndex::Bool(index) => match val.parse::<bool>() {
                 Ok(val) => Ok(index.get(&val)),
                 Err(e) => Err(e.to_string()),
             },
             ColumnIndex::Str(index) => Ok(index.get(val)),
-
             ColumnIndex::None => Ok(None),
+        }
+    }
+
+    fn get_indexes_from_op<T: Clone>(val: T, op: Binary) -> (Bound<T>, Bound<T>) {
+        match op {
+            Binary::Eq => (Included(val.clone()), Included(val)),
+            Binary::NotEq => (Excluded(val.clone()), Excluded(val)),
+            Binary::Gt => (Excluded(val), Unbounded),
+            Binary::GtEq => (Included(val), Unbounded),
+            Binary::Lt => (Unbounded, Excluded(val)),
+            Binary::LtEq => (Unbounded, Included(val)),
         }
     }
 
@@ -293,13 +301,7 @@ impl ColumnIndex {
         match self {
             ColumnIndex::Int(index) => match val.parse::<i32>() {
                 Ok(val) => {
-                    for (_, idx) in index.range(if Binary::Gt == op {
-                        (Excluded(val), Unbounded)
-                    } else if Binary::Lt == op {
-                        (Unbounded, Excluded(val))
-                    } else {
-                        (Included(val), Included(val))
-                    }) {
+                    for (_, idx) in index.range(Self::get_indexes_from_op::<i32>(val, op)) {
                         indexes.push(*idx);
                     }
                     Ok(indexes)
@@ -309,13 +311,7 @@ impl ColumnIndex {
 
             ColumnIndex::Bool(index) => match val.parse::<bool>() {
                 Ok(val) => {
-                    for (_, idx) in index.range(if Binary::Gt == op {
-                        (Excluded(val), Unbounded)
-                    } else if Binary::Lt == op {
-                        (Unbounded, Excluded(val))
-                    } else {
-                        (Included(val), Included(val))
-                    }) {
+                    for (_, idx) in index.range(Self::get_indexes_from_op::<bool>(val, op)) {
                         indexes.push(*idx);
                     }
                     Ok(indexes)
@@ -323,13 +319,9 @@ impl ColumnIndex {
                 Err(e) => Err(e.to_string()),
             },
             ColumnIndex::Str(index) => {
-                for (_, idx) in index.range(if Binary::Gt == op {
-                    (Excluded(val.to_string()), Unbounded)
-                } else if Binary::Lt == op {
-                    (Unbounded, Excluded(val.to_string()))
-                } else {
-                    (Included(val.to_string()), Included(val.to_string()))
-                }) {
+                for (_, idx) in
+                    index.range(Self::get_indexes_from_op::<String>(val.to_string(), op))
+                {
                     indexes.push(*idx);
                 }
                 Ok(indexes)
@@ -399,49 +391,45 @@ impl Table {
 
                         match col_idx {
                             ColumnIndex::Int(index) => {
-                                match index.contains_key(&val.parse::<i32>().unwrap()) {
-                                    true => {
-                                        return Err(format!(
-                                            "Error: unique constraint violation for column {}.
+                                if let true = index.contains_key(
+                                    &val.parse::<i32>().expect("Couldn't parse value to an int."),
+                                ) {
+                                    Err(format!(
+                                        "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
-                                            *name, val, *name
-                                        ));
-                                    }
-                                    false => return Ok(()),
-                                };
+                                        *name, val, *name
+                                    ))
+                                } else {
+                                    Ok(())
+                                }
                             }
                             ColumnIndex::Bool(index) => {
-                                match index.contains_key(
+                                if let true = index.contains_key(
                                     &val.parse::<bool>()
                                         .expect("couldn't parse value to be a boolean"),
                                 ) {
-                                    true => {
-                                        return Err(format!(
-                                            "Error: unique constraint violation for column {}.
+                                    Err(format!(
+                                        "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
-                                            *name, val, *name
-                                        ));
-                                    }
-                                    false => return Ok(()),
-                                };
+                                        *name, val, *name
+                                    ))
+                                } else {
+                                    Ok(())
+                                }
                             }
                             ColumnIndex::Str(index) => {
-                                match index.contains_key(val) {
-                                    true => {
-                                        return Err(format!(
-                                            "Error: unique constraint violation for column {}.
+                                if let true = index.contains_key(val) {
+                                    Err(format!(
+                                        "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
-                                            *name, val, *name
-                                        ));
-                                    }
-                                    false => return Ok(()),
-                                };
+                                        *name, val, *name
+                                    ))
+                                } else {
+                                    Ok(())
+                                }
                             }
                             ColumnIndex::None => {
-                                return Err(format!(
-                                    "Error: cannot find index for column {}",
-                                    name
-                                ));
+                                Err(format!("Error: cannot find index for column {name}"))
                             }
                         };
                     }
@@ -477,9 +465,6 @@ impl Table {
                             index.insert(val, table_col_data.count() - 1);
                         }
                     }
-                    ColumnData::Float(c_vec) => {
-                        c_vec.push(val.parse::<f32>().unwrap());
-                    }
                     ColumnData::Bool(c_vec) => {
                         let val = val.parse::<bool>().unwrap();
                         c_vec.push(val);
@@ -488,10 +473,14 @@ impl Table {
                         }
                     }
                     ColumnData::Str(c_vec) => {
-                        c_vec.push(val.to_string());
+                        let val = val.to_string();
+                        c_vec.push(val.clone());
                         if let ColumnIndex::Str(index) = col_index {
-                            index.insert(val.to_string(), table_col_data.count() - 1);
+                            index.insert(val, table_col_data.count() - 1);
                         }
+                    }
+                    ColumnData::Float(c_vec) => {
+                        c_vec.push(val.parse::<f32>().unwrap());
                     }
                     ColumnData::None => panic!("None data Found"),
                 }
@@ -523,7 +512,7 @@ impl Table {
                     .map(|col_name| {
                         self.rows
                             .get(&col_name.to_string())
-                            .expect("The searched column doestn't exist")
+                            .expect("The searched column doesn't exist")
                     })
                     .map(|col_data| col_data.get_serialized_col_data_by_index(&indices))
                     .collect::<Vec<Vec<String>>>();
@@ -537,6 +526,24 @@ impl Table {
         }
     }
 
+    fn execute_select(
+        &self,
+        sq: &SelectQuery,
+        where_expr: &Expression,
+        op: &Binary,
+        col: &ColumnHeader,
+    ) -> Vec<Vec<String>> {
+        match &col
+            .index
+            .get_idx_data_by_range(&where_expr.right, op.clone())
+        {
+            Ok(indexes) => self.select_data(&sq.projection, indexes),
+            Err(e) => {
+                panic!("Error while trying to retrieve value from index: {}", e);
+            }
+        }
+    }
+
     pub fn execute_select_query(&self, sq: &SelectQuery) {
         let mut data: Vec<Vec<String>> = vec![];
 
@@ -546,43 +553,34 @@ impl Table {
                 let col = self.get_column(where_expr.left.to_string());
 
                 if col.is_indexed {
+                    println!("Executing select expression with index");
                     match &where_expr.op {
-                        Operator::Binary(bop) => {
-                            match bop {
-                                Binary::Eq => {
-                                    match &col.index.get_idx_data(&where_expr.right) {
-                                        Ok(v) => {
-                                            let matched_indexes = match v {
-                                                Some(idx) => vec![**idx],
-                                                None => vec![],
-                                            };
-                                            data =
-                                                self.select_data(&sq.projection, &matched_indexes);
-                                        }
-                                        Err(e) => {
-                                            println!("Error while trying to retrieve value from index: {}", e);
-                                        }
-                                    }
+                        Operator::Binary(bop) => match bop {
+                            Binary::Eq => match &col.index.get_idx_data(&where_expr.right) {
+                                Ok(v) => {
+                                    let matched_indexes = match v {
+                                        Some(idx) => vec![**idx],
+                                        None => vec![],
+                                    };
+                                    data = self.select_data(&sq.projection, &matched_indexes);
                                 }
-                                Binary::Gt => {
-                                    match &col
-                                        .index
-                                        .get_idx_data_by_range(&where_expr.right, Binary::Gt)
-                                    {
-                                        Ok(indexes) => {
-                                            data = self.select_data(&sq.projection, indexes);
-                                        }
-                                        Err(e) => {
-                                            println!("Error while trying to retrieve value from index: {}", e);
-                                        }
-                                    }
+                                Err(e) => {
+                                    println!(
+                                        "Error while trying to retrieve value from index: {e}"
+                                    );
                                 }
-                                _ => {}
+                            },
+                            Binary::Gt
+                            | Binary::Lt
+                            | Binary::LtEq
+                            | Binary::GtEq
+                            | Binary::NotEq => {
+                                data = self.execute_select(sq, where_expr, bop, col);
                             }
-                        }
+                        },
                     }
                 } else {
-                    println!("Executing select expression wihtout index");
+                    println!("Executing select expression without index");
                     data = self.execute_select_query_without_index(sq);
                 }
             }

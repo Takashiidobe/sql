@@ -25,6 +25,7 @@ impl MetaCommand {
     fn trim_command(command: &str, meta_command: &str) -> String {
         let command = command.replace(meta_command, "");
         let command = command.replace('\'', "");
+        let command = command.replace('\"', "");
         command.trim().to_string()
     }
 
@@ -204,12 +205,10 @@ pub fn process_command(query: String, db: &mut Database) {
                             db_table.execute_select_query(&sq);
                         }
                         false => {
-                            println!("Cannot execute query the table {} doesn't exists", sq.from);
+                            eprintln!("Cannot execute query the table {} doesn't exists", sq.from)
                         }
                     },
-                    Err(error) => {
-                        println!("{}", error);
-                    }
+                    Err(error) => eprintln!("{error}"),
                 }
             }
             _ => {

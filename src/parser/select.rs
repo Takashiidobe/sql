@@ -4,7 +4,7 @@ use sqlparser::ast::{
     SetExpr, Statement, TableFactor, Value,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Binary {
     NotEq,
     Eq,
@@ -19,7 +19,20 @@ pub enum Operator {
     Binary(Binary),
 }
 
-// Only binary operators for now
+impl From<BinaryOperator> for Operator {
+    fn from(b: BinaryOperator) -> Self {
+        match b {
+            BinaryOperator::Eq => Operator::Binary(Binary::Eq),
+            BinaryOperator::NotEq => Operator::Binary(Binary::NotEq),
+            BinaryOperator::Gt => Operator::Binary(Binary::Gt),
+            BinaryOperator::GtEq => Operator::Binary(Binary::GtEq),
+            BinaryOperator::Lt => Operator::Binary(Binary::Lt),
+            BinaryOperator::LtEq => Operator::Binary(Binary::LtEq),
+            _ => panic!("Converting from unsupported BinaryOperator"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Expression {
     pub left: String,
@@ -42,46 +55,16 @@ impl SelectQuery {
         n: &String,
     ) {
         match op {
-            sqlparser::ast::BinaryOperator::NotEq => {
+            BinaryOperator::Eq
+            | BinaryOperator::NotEq
+            | BinaryOperator::Gt
+            | BinaryOperator::Lt
+            | BinaryOperator::LtEq
+            | BinaryOperator::GtEq => {
                 where_expressions.push(Expression {
                     left: col_name.to_string(),
                     right: n.to_string(),
-                    op: Operator::Binary(Binary::NotEq),
-                });
-            }
-            sqlparser::ast::BinaryOperator::Eq => {
-                where_expressions.push(Expression {
-                    left: col_name.to_string(),
-                    right: n.to_string(),
-                    op: Operator::Binary(Binary::Eq),
-                });
-            }
-            sqlparser::ast::BinaryOperator::Gt => {
-                where_expressions.push(Expression {
-                    left: col_name.to_string(),
-                    right: n.to_string(),
-                    op: Operator::Binary(Binary::Gt),
-                });
-            }
-            sqlparser::ast::BinaryOperator::Lt => {
-                where_expressions.push(Expression {
-                    left: col_name.to_string(),
-                    right: n.to_string(),
-                    op: Operator::Binary(Binary::Lt),
-                });
-            }
-            sqlparser::ast::BinaryOperator::LtEq => {
-                where_expressions.push(Expression {
-                    left: col_name.to_string(),
-                    right: n.to_string(),
-                    op: Operator::Binary(Binary::LtEq),
-                });
-            }
-            sqlparser::ast::BinaryOperator::GtEq => {
-                where_expressions.push(Expression {
-                    left: col_name.to_string(),
-                    right: n.to_string(),
-                    op: Operator::Binary(Binary::GtEq),
+                    op: Operator::from(op.clone()),
                 });
             }
             _ => {
@@ -154,7 +137,6 @@ impl SelectQuery {
                                         if let Value::NationalStringLiteral(n) = v {
                                             Self::add_ops(op, &mut where_expressions, col_name, n);
                                         }
-
                                         if let Value::SingleQuotedString(n) = v {
                                             Self::add_ops(op, &mut where_expressions, col_name, n);
                                         }
@@ -170,13 +152,9 @@ impl SelectQuery {
                         None => {}
                     }
                 }
-                _ => {
-                    println!("don't care");
-                }
+                _ => unimplemented!(),
             },
-            _ => {
-                println!("don't care");
-            }
+            _ => unimplemented!(),
         }
 
         match table_name {
