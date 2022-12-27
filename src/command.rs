@@ -16,20 +16,34 @@ pub enum MetaCommand {
     Exit,
     ListTables,
     PrintData,
-    Persist,
-    Restore,
+    Persist(String),
+    Restore(String),
     Unknown(String),
 }
 
 impl MetaCommand {
+    fn trim_command(command: &str, meta_command: &str) -> String {
+        let command = command.replace(meta_command, "");
+        let command = command.replace('\'', "");
+        command.trim().to_string()
+    }
+
     pub fn new(command: String) -> MetaCommand {
         match command.as_ref() {
             ".exit" => MetaCommand::Exit,
             ".tables" => MetaCommand::ListTables,
             ".data" => MetaCommand::PrintData,
-            ".persist" => MetaCommand::Persist,
-            ".restore" => MetaCommand::Restore,
-            _ => MetaCommand::Unknown(command),
+            _ => {
+                if command.starts_with(".persist") {
+                    let trimmed_command = Self::trim_command(&command, ".persist");
+                    MetaCommand::Persist(trimmed_command)
+                } else if command.starts_with(".restore") {
+                    let trimmed_command = Self::trim_command(&command, ".restore");
+                    MetaCommand::Restore(trimmed_command)
+                } else {
+                    MetaCommand::Unknown(command)
+                }
+            }
         }
     }
 }
@@ -45,7 +59,7 @@ pub enum DbCommand {
 
 impl DbCommand {
     pub fn new(command: String) -> DbCommand {
-        let v = command.split(" ").collect::<Vec<&str>>();
+        let v = command.split(' ').collect::<Vec<&str>>();
         match v[0] {
             "insert" => DbCommand::Insert(command),
             "update" => DbCommand::Update(command),
@@ -63,7 +77,7 @@ pub enum CommandType {
 }
 
 pub fn get_command_type(cmd: &String) -> CommandType {
-    match cmd.starts_with(".") {
+    match cmd.starts_with('.') {
         true => CommandType::MetaCommand(MetaCommand::new(cmd.to_owned())),
         false => CommandType::DbCommand(DbCommand::new(cmd.to_owned())),
     }
@@ -85,13 +99,13 @@ pub fn handle_meta_command(cmd: MetaCommand, db: &mut Database) {
                 table.print_table_data();
             }
         }
-        MetaCommand::Persist => {
-            let mut buffered_writer = BufWriter::new(File::create("dbfile1.bin").unwrap());
+        MetaCommand::Persist(file_path) => {
+            let mut buffered_writer = BufWriter::new(File::create(file_path).unwrap());
             bincode::serialize_into(&mut buffered_writer, &db)
                 .expect("Error while trying to serialize to binary data");
         }
-        MetaCommand::Restore => {
-            let mut file = File::open("dbfile1.bin").unwrap();
+        MetaCommand::Restore(file_path) => {
+            let mut file = File::open(file_path).unwrap();
             let decoded_db: Database = bincode::deserialize_from(&mut file).unwrap();
             *db = decoded_db;
         }
@@ -149,11 +163,11 @@ pub fn process_command(query: String, db: &mut Database) {
                 }
             }
             Statement::Query(_q) => {
-                let select_query = SelectQuery::new(&s);
+                let select_query = SelectQuery::new(s);
                 match select_query {
-                    Ok(mut sq) => match db.table_exists((&sq.from).to_string()) {
+                    Ok(mut sq) => match db.table_exists(sq.from.to_string()) {
                         true => {
-                            let db_table = db.get_table((&sq.from).to_string());
+                            let db_table = db.get_table(sq.from.to_string());
 
                             let cloned_projection = sq.projection.clone();
 
