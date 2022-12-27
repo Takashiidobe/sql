@@ -1,4 +1,4 @@
-use prettytable::{Cell, Row, Table as PTable};
+use prettytable::{row, Cell, Row, Table as PTable};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
