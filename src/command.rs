@@ -113,7 +113,7 @@ pub fn handle_meta_command(cmd: MetaCommand, db: &mut Database) {
             let decoded_db: Database = bincode::deserialize_from(&mut file).unwrap();
             *db = decoded_db;
         }
-        MetaCommand::Unknown(cmd) => println!("Unrecognized meta command {}", cmd),
+        MetaCommand::Unknown(cmd) => eprintln!("Unrecognized meta command {cmd}"),
     }
 }
 
@@ -150,9 +150,8 @@ pub fn process_command(query: String, db: &mut Database) {
                                             match db_table
                                                 .does_violate_unique_constraint(&columns, value)
                                             {
-                                                Err(err) => println!(
-                                                    "Unique key constaint violation: {}",
-                                                    err
+                                                Err(err) => eprintln!(
+                                                    "Unique key constaint violation: {err}"
                                                 ),
                                                 Ok(()) => {
                                                     db_table.insert_row(&columns, &values);
@@ -161,14 +160,16 @@ pub fn process_command(query: String, db: &mut Database) {
                                         }
                                     }
                                     false => {
-                                        println!("Cannot insert, some of the columns do not exist");
+                                        eprintln!(
+                                            "Cannot insert, some of the columns do not exist"
+                                        );
                                     }
                                 }
                             }
-                            false => println!("Table doesn't exist"),
+                            false => eprintln!("Table doesn't exist"),
                         }
                     }
-                    Err(err) => println!("Error while trying to parse insert statement: {}", err),
+                    Err(err) => eprintln!("Error while trying to parse insert statement: {err}"),
                 }
             }
             Statement::Query(_) => {

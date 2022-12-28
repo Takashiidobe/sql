@@ -8,7 +8,7 @@ pub struct Database {
 
 impl Database {
     pub fn new() -> Database {
-        return Database { tables: vec![] };
+        Database { tables: vec![] }
     }
 
     pub fn table_exists(&self, tname: String) -> bool {

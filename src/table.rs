@@ -201,8 +201,7 @@ impl ColumnData {
                     |a, b| a != b,
                     |a, b| a != b,
                 ),
-                Binary::Eq => Self::work(
-                    self,
+                Binary::Eq => self.work(
                     &search_term,
                     &mut scanned_vals,
                     |a, b| a == b,
@@ -210,8 +209,7 @@ impl ColumnData {
                     |a, b| a == b,
                     |a, b| a == b,
                 ),
-                Binary::Gt => Self::work(
-                    self,
+                Binary::Gt => self.work(
                     &search_term,
                     &mut scanned_vals,
                     |a, b| a > b,
@@ -219,8 +217,7 @@ impl ColumnData {
                     |a, b| a > b,
                     |a, b| a & !b,
                 ),
-                Binary::Lt => Self::work(
-                    self,
+                Binary::Lt => self.work(
                     &search_term,
                     &mut scanned_vals,
                     |a, b| a < b,
@@ -228,8 +225,7 @@ impl ColumnData {
                     |a, b| a < b,
                     |a, b| !a & b,
                 ),
-                Binary::LtEq => Self::work(
-                    self,
+                Binary::LtEq => self.work(
                     &search_term,
                     &mut scanned_vals,
                     |a, b| a <= b,
@@ -237,8 +233,7 @@ impl ColumnData {
                     |a, b| a <= b,
                     |a, b| a <= b,
                 ),
-                Binary::GtEq => Self::work(
-                    self,
+                Binary::GtEq => self.work(
                     &search_term,
                     &mut scanned_vals,
                     |a, b| a >= b,
@@ -394,13 +389,13 @@ impl Table {
                                 if let true = index.contains_key(
                                     &val.parse::<i32>().expect("Couldn't parse value to an int."),
                                 ) {
-                                    Err(format!(
+                                    return Err(format!(
                                         "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
                                         *name, val, *name
-                                    ))
+                                    ));
                                 } else {
-                                    Ok(())
+                                    return Ok(());
                                 }
                             }
                             ColumnIndex::Bool(index) => {
@@ -408,30 +403,30 @@ impl Table {
                                     &val.parse::<bool>()
                                         .expect("couldn't parse value to be a boolean"),
                                 ) {
-                                    Err(format!(
+                                    return Err(format!(
                                         "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
                                         *name, val, *name
-                                    ))
+                                    ));
                                 } else {
-                                    Ok(())
+                                    return Ok(());
                                 }
                             }
                             ColumnIndex::Str(index) => {
                                 if let true = index.contains_key(val) {
-                                    Err(format!(
+                                    return Err(format!(
                                         "Error: unique constraint violation for column {}.
                             Value {} already exists for column {}",
                                         *name, val, *name
-                                    ))
+                                    ));
                                 } else {
-                                    Ok(())
+                                    return Ok(());
                                 }
                             }
                             ColumnIndex::None => {
-                                Err(format!("Error: cannot find index for column {name}"))
+                                return Err(format!("Error: cannot find index for column {name}"));
                             }
-                        };
+                        }
                     }
                 }
             }
@@ -506,8 +501,7 @@ impl Table {
 
                 let indices = row.get_serialized_col_data_by_scanning(where_expr);
 
-                let projected_data = sq
-                    .projection
+                sq.projection
                     .iter()
                     .map(|col_name| {
                         self.rows
@@ -515,9 +509,7 @@ impl Table {
                             .expect("The searched column doesn't exist")
                     })
                     .map(|col_data| col_data.get_serialized_col_data_by_index(&indices))
-                    .collect::<Vec<Vec<String>>>();
-
-                projected_data
+                    .collect::<Vec<Vec<String>>>()
             }
 
             None => {
